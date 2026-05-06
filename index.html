@@ -1105,6 +1105,11 @@ function markScheduledPayment(id, schedIdx) {
   note.payments.push({ date: row.date, amount: row.payment, late: false, lateFee: 0 });
   save();
   renderDetail(id);
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const schedBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Full Schedule'));
+  if (schedBtn) schedBtn.classList.add('active');
+  document.getElementById('tabSchedule').classList.add('active');
 }
 
 function drawChart(note, schedule, stats) {
@@ -1112,46 +1117,54 @@ function drawChart(note, schedule, stats) {
   if (!ctx) return;
   if (amortChart) { amortChart.destroy(); amortChart = null; }
 
-  const schedLabels = schedule.map(r => r.date);
-  const schedBalances = schedule.map(r => parseFloat(r.balance.toFixed(2)));
+  const milestones = [
+    { label: 'Year 1',  idx: 11 },
+    { label: 'Year 10', idx: 119 },
+    { label: 'Year 30', idx: 359 },
+  ].filter(m => m.idx < schedule.length);
 
-  // Actual curve
-  const actualLabels = [];
-  const actualBalances = [];
-  if (stats.ledger.length > 0) {
-    actualLabels.push(note.startDate);
-    actualBalances.push(parseFloat(note.principal));
-    stats.ledger.forEach(p => {
-      actualLabels.push(p.date);
-      actualBalances.push(parseFloat(p.balance.toFixed(2)));
-    });
+  // If the loan is shorter, also include the final payment as a milestone
+  if (milestones.length === 0) {
+    milestones.push({ label: `Month ${schedule.length}`, idx: schedule.length - 1 });
   }
 
+  const labels     = milestones.map(m => m.label);
+  const principals = milestones.map(m => parseFloat(schedule[m.idx].principal.toFixed(2)));
+  const interests  = milestones.map(m => parseFloat(schedule[m.idx].interest.toFixed(2)));
+  const balances   = milestones.map(m => parseFloat(schedule[m.idx].balance.toFixed(2)));
+
   amortChart = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
+      labels,
       datasets: [
         {
-          label: 'Scheduled Balance',
-          data: schedLabels.map((l, i) => ({ x: l, y: schedBalances[i] })),
-          borderColor: '#94a3b8',
-          borderWidth: 2,
-          borderDash: [6, 4],
-          pointRadius: 0,
-          fill: false,
-          tension: 0.2
+          label: 'Principal Portion',
+          data: principals,
+          backgroundColor: 'rgba(22,101,52,0.85)',
+          borderRadius: 6,
+          order: 1
         },
-        ...(actualBalances.length > 0 ? [{
-          label: 'Actual Balance',
-          data: actualLabels.map((l, i) => ({ x: l, y: actualBalances[i] })),
+        {
+          label: 'Interest Portion',
+          data: interests,
+          backgroundColor: 'rgba(180,83,9,0.80)',
+          borderRadius: 6,
+          order: 1
+        },
+        {
+          label: 'Remaining Balance',
+          data: balances,
+          type: 'line',
           borderColor: '#1a3a5c',
-          backgroundColor: 'rgba(26,58,92,0.07)',
+          backgroundColor: 'rgba(26,58,92,0.08)',
           borderWidth: 2.5,
-          pointRadius: 3,
+          pointRadius: 6,
           pointBackgroundColor: '#1a3a5c',
-          fill: true,
-          tension: 0.2
-        }] : [])
+          fill: false,
+          yAxisID: 'yBalance',
+          order: 0
+        }
       ]
     },
     options: {
@@ -1165,24 +1178,33 @@ function drawChart(note, schedule, stats) {
         },
         tooltip: {
           callbacks: {
-            label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+            label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           }
         }
       },
       scales: {
         x: {
-          type: 'time',
-          time: { unit: 'year', tooltipFormat: 'MMM yyyy' },
-          grid: { color: 'rgba(0,0,0,0.05)' },
-          ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6b7280' }
+          grid: { display: false },
+          ticks: { font: { family: 'DM Sans', size: 13, weight: '500' }, color: '#374151' }
         },
         y: {
+          title: { display: true, text: 'Monthly Payment Split ($)', font: { family: 'DM Sans', size: 11 }, color: '#6b7280' },
           ticks: {
             font: { family: 'DM Sans', size: 11 },
             color: '#6b7280',
-            callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v)
+            callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v)
           },
           grid: { color: 'rgba(0,0,0,0.05)' }
+        },
+        yBalance: {
+          position: 'right',
+          title: { display: true, text: 'Remaining Balance ($)', font: { family: 'DM Sans', size: 11 }, color: '#1a3a5c' },
+          ticks: {
+            font: { family: 'DM Sans', size: 11 },
+            color: '#1a3a5c',
+            callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v)
+          },
+          grid: { display: false }
         }
       }
     }
