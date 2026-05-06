@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mortgage Note Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --ink: #0f1117;
+    --ink-2: #2d3142;
+    --ink-3: #6b7280;
+    --ink-4: #9ca3af;
+    --paper: #fafaf8;
+    --surface: #ffffff;
+    --surface-2: #f5f4f0;
+    --border: #e8e6e0;
+    --border-2: #d1cec6;
+    --accent: #1a3a5c;
+    --accent-light: #e8f0f8;
+    --green: #166534;
+    --green-bg: #dcfce7;
+    --amber: #92400e;
+    --amber-bg: #fef3c7;
+    --red: #991b1b;
+    --red-bg: #fee2e2;
+    --blue: #1d4ed8;
+    --blue-bg: #dbeafe;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+    --shadow-lg: 0 4px 24px rgba(0,0,0,0.10);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* NAV */
+  .topnav {
+    background: var(--accent);
+    color: #fff;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  }
+  .nav-brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+  .nav-brand svg { opacity: 0.85; }
+  .nav-actions { display: flex; align-items: center; gap: 12px; }
+  .btn-nav-back {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+  }
+  .btn-nav-back:hover { background: rgba(255,255,255,0.25); }
+
+  /* PAGES */
+  .page { display: none; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* DASHBOARD */
+  .dash-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .dash-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .dash-subtitle { color: var(--ink-3); font-size: 14px; margin-top: 4px; }
+
+  /* SUMMARY STRIP */
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .strip-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .strip-label { font-size: 12px; color: var(--ink-3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .strip-value { font-size: 1.5rem; font-weight: 600; color: var(--ink); }
+  .strip-value.green { color: var(--green); }
+  .strip-value.amber { color: #b45309; }
+
+  /* NOTE CARDS GRID */
+  .notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.25rem;
+  }
+  .note-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .note-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+    border-color: var(--border-2);
+  }
+  .note-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--accent);
+    border-radius: 4px 0 0 4px;
+  }
+  .note-card.late::before { background: #dc2626; }
+  .note-card.paid::before { background: #16a34a; }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+  .card-address { font-weight: 600; font-size: 0.95rem; color: var(--ink); line-height: 1.3; max-width: 200px; }
+  .card-borrower { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .badge.current { background: var(--green-bg); color: var(--green); }
+  .badge.late { background: var(--red-bg); color: var(--red); }
+  .badge.paid { background: var(--blue-bg); color: var(--blue); }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1rem;
+    margin: 0.75rem 0;
+  }
+  .card-field { }
+  .field-label { font-size: 11px; color: var(--ink-4); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+  .field-value { font-size: 14px; color: var(--ink-2); font-weight: 500; }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 0.5rem;
+  }
+  .card-actions { display: flex; gap: 8px; }
+  .btn-icon {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--ink-3);
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn-icon:hover { background: var(--border); color: var(--ink); }
+  .btn-icon.danger:hover { background: var(--red-bg); color: var(--red); border-color: #fca5a5; }
+  .next-due { font-size: 12px; color: var(--ink-3); }
+  .next-due.overdue { color: var(--red); font-weight: 600; }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 5rem 2rem;
+    color: var(--ink-3);
+  }
+  .empty-state h3 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--ink); margin-bottom: 0.5rem; }
+  .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+
+  /* BUTTONS */
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: opacity 0.15s, transform 0.12s;
+  }
+  .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--ink-2);
+    border: 1px solid var(--border-2);
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: var(--surface-2); }
+  .btn-danger {
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* DETAIL PAGE */
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+  .detail-title { font-family: 'DM Serif Display', serif; font-size: 1.75rem; }
+  .detail-sub { color: var(--ink-3); font-size: 14px; margin-top: 4px; }
+  .detail-badge { margin-top: 8px; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .stat-label { font-size: 11px; color: var(--ink-3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .stat-value { font-size: 1.3rem; font-weight: 600; color: var(--ink); }
+  .stat-sub { font-size: 12px; color: var(--ink-4); margin-top: 2px; }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    transition: color 0.15s;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--ink); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* CHART CONTAINER */
+  .chart-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+    position: relative;
+    height: 360px;
+  }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    font-size: 13.5px;
+  }
+  thead { background: var(--surface-2); }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+  .td-highlight { font-weight: 600; color: var(--ink); }
+  .td-interest { color: #b45309; }
+  .td-principal { color: var(--green); }
+  .td-late { background: var(--red-bg) !important; }
+
+  /* PAYMENT FORM */
+  .pay-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+  }
+  .pay-form-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .form-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+  .form-group label { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+  .form-group input, .form-group select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--paper);
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--surface);
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .checkbox-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+  .checkbox-row label { font-size: 13px; color: var(--ink-2); cursor: pointer; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,17,23,0.6);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    backdrop-filter: blur(2px);
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 2rem;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+  }
+  .modal-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-close {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--ink-3);
+    flex-shrink: 0;
+  }
+  .modal-close:hover { background: var(--border); color: var(--ink); }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .modal-grid .full { grid-column: 1 / -1; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.5rem; flex-wrap: wrap; }
+
+  /* PROGRESS BAR */
+  .progress-wrap { margin-top: 8px; }
+  .progress-bar-bg { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+  .progress-bar-fill { background: var(--accent); height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-4); margin-top: 4px; }
+
+  /* PROJECTED PAYOFF */
+  .payoff-info {
+    background: var(--accent-light);
+    border: 1px solid #bcd1e8;
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* LTV */
+  .ltv-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .ltv-row label { font-size: 13px; color: var(--ink-3); font-weight: 500; flex-shrink: 0; }
+  .ltv-row input {
+    padding: 6px 10px;
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    width: 160px;
+  }
+  .ltv-result { font-size: 14px; color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 600px) {
+    .topnav { padding: 0 1rem; }
+    .page { padding: 1rem; }
+    .modal-grid { grid-template-columns: 1fr; }
+    .modal-grid .full { grid-column: 1; }
+    .form-row { flex-direction: column; }
+  }
+
+  /* CONFETTI for paid off */
+  .paid-banner {
+    background: var(--green-bg);
+    border: 1px solid #86efac;
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1.25rem;
+    color: var(--green);
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="nav-brand" onclick="showDashboard()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    Mortgage Note Manager
+  </div>
+  <div class="nav-actions" id="navActions"></div>
+</nav>
+
+<!-- DASHBOARD PAGE -->
+<div class="page active" id="dashPage">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Your Notes</div>
+      <div class="dash-subtitle">Seller-financed mortgage portfolio</div>
+    </div>
+    <button class="btn-primary" onclick="openAddModal()">
+      + Add Note
+    </button>
+  </div>
+  <div class="summary-strip" id="summaryStrip"></div>
+  <div class="notes-grid" id="notesGrid"></div>
+</div>
+
+<!-- DETAIL PAGE -->
+<div class="page" id="detailPage">
+  <div id="detailContent"></div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay hidden" id="noteModal">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modalTitle">Add Mortgage Note</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-grid">
+      <div class="form-group full">
+        <label>Property Address</label>
+        <input type="text" id="f_address" placeholder="123 Main St, City, State">
+      </div>
+      <div class="form-group">
+        <label>Borrower Name</label>
+        <input type="text" id="f_borrower" placeholder="John Smith">
+      </div>
+      <div class="form-group">
+        <label>Original Loan Amount ($)</label>
+        <input type="number" id="f_principal" placeholder="200000" min="0">
+      </div>
+      <div class="form-group">
+        <label>Annual Interest Rate (%)</label>
+        <input type="number" id="f_rate" placeholder="6.5" step="0.01" min="0" max="30">
+      </div>
+      <div class="form-group">
+        <label>Loan Term</label>
+        <input type="number" id="f_term" placeholder="30" min="1">
+      </div>
+      <div class="form-group">
+        <label>Term Unit</label>
+        <select id="f_termUnit">
+          <option value="years">Years</option>
+          <option value="months">Months</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Loan Start Date</label>
+        <input type="date" id="f_startDate">
+      </div>
+      <div class="form-group">
+        <label>Monthly Payment ($)</label>
+        <input type="number" id="f_payment" placeholder="Auto-calculated" min="0">
+      </div>
+      <div class="form-group">
+        <label>Balloon Payment Date (optional)</label>
+        <input type="date" id="f_balloonDate">
+      </div>
+      <div class="form-group">
+        <label>Balloon Amount ($) (optional)</label>
+        <input type="number" id="f_balloonAmt" placeholder="50000" min="0">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title">
+      <span>Confirm Delete</span>
+      <button class="modal-close" onclick="closeConfirm()">✕</button>
+    </div>
+    <p style="color:var(--ink-2);margin-bottom:1.5rem;">This will permanently delete this note and all its payment history. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-danger" id="confirmDeleteBtn">Delete Note</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// DATA LAYER
+// ═══════════════════════════════════════
+let notes = JSON.parse(localStorage.getItem('mnm_notes') || '[]');
+let currentNoteId = null;
+let editingNoteId = null;
+let deleteTargetId = null;
+let amortChart = null;
+
+function save() {
+  localStorage.setItem('mnm_notes', JSON.stringify(notes));
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// ═══════════════════════════════════════
+// AMORTIZATION ENGINE
+// ═══════════════════════════════════════
+function calcMonthlyPayment(principal, annualRate, termMonths) {
+  if (annualRate === 0) return principal / termMonths;
+  const r = annualRate / 100 / 12;
+  return principal * r * Math.pow(1 + r, termMonths) / (Math.pow(1 + r, termMonths) - 1);
+}
+
+function buildSchedule(note) {
+  const principal = parseFloat(note.principal);
+  const annualRate = parseFloat(note.rate);
+  const termMonths = note.termUnit === 'years' ? parseInt(note.term) * 12 : parseInt(note.term);
+  const monthlyRate = annualRate / 100 / 12;
+  const payment = parseFloat(note.payment) || calcMonthlyPayment(principal, annualRate, termMonths);
+  const startDate = new Date(note.startDate + 'T00:00:00');
+  const balloonDate = note.balloonDate ? new Date(note.balloonDate + 'T00:00:00') : null;
+  const balloonAmt = note.balloonAmt ? parseFloat(note.balloonAmt) : null;
+
+  let balance = principal;
+  const schedule = [];
+
+  for (let i = 1; i <= termMonths; i++) {
+    if (balance <= 0.01) break;
+    const d = new Date(startDate);
+    d.setMonth(d.getMonth() + i);
+    const interest = balance * monthlyRate;
+    let prin;
+    let isBalloon = false;
+    let payAmt = payment;
+
+    if (balloonDate && d >= balloonDate && balloonAmt) {
+      payAmt = Math.min(balance + interest, balloonAmt + interest);
+      prin = payAmt - interest;
+      isBalloon = true;
+    } else if (i === termMonths || balance + interest <= payment) {
+      payAmt = balance + interest;
+      prin = balance;
+    } else {
+      prin = payment - interest;
+    }
+
+    balance = Math.max(0, balance - prin);
+    schedule.push({
+      num: i,
+      date: d.toISOString().split('T')[0],
+      payment: payAmt,
+      principal: prin,
+      interest: interest,
+      balance: balance,
+      isBalloon: isBalloon
+    });
+    if (balance <= 0.01 || isBalloon) break;
+  }
+  return schedule;
+}
+
+function getActualStats(note) {
+  const payments = note.payments || [];
+  const schedule = buildSchedule(note);
+  const principal = parseFloat(note.principal);
+  const monthlyRate = parseFloat(note.rate) / 100 / 12;
+
+  let balance = principal;
+  let totalInterestPaid = 0;
+  let totalPrincipalPaid = 0;
+  const ledger = [];
+
+  for (let i = 0; i < payments.length; i++) {
+    const p = payments[i];
+    const interest = balance * monthlyRate;
+    const lateFee = p.late ? (parseFloat(p.lateFee) || 0) : 0;
+    const appliedToLoan = parseFloat(p.amount) - lateFee;
+    const prinPaid = Math.max(0, Math.min(appliedToLoan - interest, balance));
+    const intPaid = Math.min(appliedToLoan, interest);
+    balance = Math.max(0, balance - prinPaid);
+    totalInterestPaid += intPaid;
+    totalPrincipalPaid += prinPaid;
+    ledger.push({
+      ...p,
+      interest: intPaid,
+      principal: prinPaid,
+      lateFee: lateFee,
+      balance: balance
+    });
+  }
+
+  // Project payoff from current balance
+  let projMonths = 0;
+  let projBalance = balance;
+  const payment = parseFloat(note.payment) || (schedule[0] ? schedule[0].payment : 0);
+  if (projBalance > 0 && payment > projBalance * monthlyRate) {
+    while (projBalance > 0.01 && projMonths < 999) {
+      const int = projBalance * monthlyRate;
+      projBalance = Math.max(0, projBalance - (payment - int));
+      projMonths++;
+    }
+  }
+
+  const lastPayDate = payments.length > 0 ? new Date(payments[payments.length - 1].date + 'T00:00:00') : null;
+  let projPayoffDate = null;
+  if (lastPayDate && projMonths > 0) {
+    projPayoffDate = new Date(lastPayDate);
+    projPayoffDate.setMonth(projPayoffDate.getMonth() + projMonths);
+  } else if (schedule.length > 0 && payments.length === 0) {
+    projPayoffDate = new Date(schedule[schedule.length - 1].date + 'T00:00:00');
+  }
+
+  const totalScheduledInterest = schedule.reduce((s, r) => s + r.interest, 0);
+  const totalInterestRemaining = totalScheduledInterest - totalInterestPaid;
+
+  return {
+    balance,
+    totalInterestPaid,
+    totalPrincipalPaid,
+    totalInterestRemaining: Math.max(0, totalInterestRemaining),
+    ledger,
+    projPayoffDate,
+    pctPaid: (totalPrincipalPaid / principal) * 100
+  };
+}
+
+function getNoteStatus(note) {
+  if (!note.payments || note.payments.length === 0) return 'current';
+  const stats = getActualStats(note);
+  if (stats.balance <= 0.01) return 'paid';
+  const schedule = buildSchedule(note);
+  const pmtCount = note.payments.length;
+  if (pmtCount < schedule.length) {
+    const expected = schedule[pmtCount - 1];
+    const last = note.payments[pmtCount - 1];
+    if (last && last.late) return 'late';
+  }
+  return 'current';
+}
+
+function getNextDueDate(note) {
+  const schedule = buildSchedule(note);
+  const pmtsMade = (note.payments || []).length;
+  if (pmtsMade >= schedule.length) return null;
+  return schedule[pmtsMade].date;
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+function showDashboard() {
+  document.getElementById('dashPage').classList.add('active');
+  document.getElementById('detailPage').classList.remove('active');
+  document.getElementById('navActions').innerHTML = '';
+  currentNoteId = null;
+  renderDashboard();
+}
+
+function renderDashboard() {
+  // Summary strip
+  const strip = document.getElementById('summaryStrip');
+  const totalBalance = notes.reduce((s, n) => {
+    const stats = getActualStats(n);
+    return s + stats.balance;
+  }, 0);
+  const totalOriginal = notes.reduce((s, n) => s + parseFloat(n.principal), 0);
+  const totalInterestReceived = notes.reduce((s, n) => s + getActualStats(n).totalInterestPaid, 0);
+  const activeNotes = notes.filter(n => getNoteStatus(n) !== 'paid').length;
+  const lateNotes = notes.filter(n => getNoteStatus(n) === 'late').length;
+
+  strip.innerHTML = `
+    <div class="strip-card">
+      <div class="strip-label">Active Notes</div>
+      <div class="strip-value">${activeNotes}</div>
+    </div>
+    <div class="strip-card">
+      <div class="strip-label">Total Outstanding</div>
+      <div class="strip-value">${fmt(totalBalance)}</div>
+    </div>
+    <div class="strip-card">
+      <div class="strip-label">Original Portfolio</div>
+      <div class="strip-value">${fmt(totalOriginal)}</div>
+    </div>
+    <div class="strip-card">
+      <div class="strip-label">Interest Collected</div>
+      <div class="strip-value green">${fmt(totalInterestReceived)}</div>
+    </div>
+    ${lateNotes > 0 ? `<div class="strip-card"><div class="strip-label">Late Notes</div><div class="strip-value amber">${lateNotes}</div></div>` : ''}
+  `;
+
+  const grid = document.getElementById('notesGrid');
+  if (notes.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon">🏠</div>
+        <h3>No mortgage notes yet</h3>
+        <p style="margin-top:8px;margin-bottom:1.5rem;">Add your first seller-financed note to get started.</p>
+        <button class="btn-primary" onclick="openAddModal()">+ Add Note</button>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = notes.map(note => {
+    const status = getNoteStatus(note);
+    const stats = getActualStats(note);
+    const nextDue = getNextDueDate(note);
+    const today = new Date().toISOString().split('T')[0];
+    const isOverdue = nextDue && nextDue < today;
+    const payment = parseFloat(note.payment) || calcMonthlyPayment(parseFloat(note.principal), parseFloat(note.rate), note.termUnit === 'years' ? parseInt(note.term) * 12 : parseInt(note.term));
+
+    return `
+      <div class="note-card ${status}" onclick="showDetail('${note.id}')">
+        <div class="card-header">
+          <div>
+            <div class="card-address">${note.address}</div>
+            <div class="card-borrower">${note.borrower}</div>
+          </div>
+          <span class="badge ${status}">${status === 'current' ? 'Current' : status === 'late' ? 'Late' : 'Paid Off'}</span>
+        </div>
+        <div class="card-grid">
+          <div class="card-field">
+            <div class="field-label">Original Loan</div>
+            <div class="field-value">${fmt(note.principal)}</div>
+          </div>
+          <div class="card-field">
+            <div class="field-label">Current Balance</div>
+            <div class="field-value">${fmt(stats.balance)}</div>
+          </div>
+          <div class="card-field">
+            <div class="field-label">Interest Rate</div>
+            <div class="field-value">${note.rate}%</div>
+          </div>
+          <div class="card-field">
+            <div class="field-label">Monthly Payment</div>
+            <div class="field-value">${fmt(payment)}</div>
+          </div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width:${Math.min(100, stats.pctPaid).toFixed(1)}%"></div>
+          </div>
+          <div class="progress-label">
+            <span>${stats.pctPaid.toFixed(1)}% principal paid</span>
+            <span>${fmt(stats.balance)} left</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="next-due ${isOverdue ? 'overdue' : ''}">
+            ${nextDue ? (isOverdue ? '⚠ Due ' : 'Next: ') + fmtDate(nextDue) : (status === 'paid' ? '✓ Fully paid off' : '—')}
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="btn-icon" onclick="openEditModal('${note.id}')">Edit</button>
+            <button class="btn-icon danger" onclick="confirmDelete('${note.id}')">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// DETAIL PAGE
+// ═══════════════════════════════════════
+function showDetail(id) {
+  currentNoteId = id;
+  document.getElementById('dashPage').classList.remove('active');
+  document.getElementById('detailPage').classList.add('active');
+  document.getElementById('navActions').innerHTML = `
+    <button class="btn-nav-back" onclick="showDashboard()">← Dashboard</button>
+  `;
+  renderDetail(id);
+}
+
+function renderDetail(id) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+
+  const status = getNoteStatus(note);
+  const stats = getActualStats(note);
+  const schedule = buildSchedule(note);
+  const payment = parseFloat(note.payment) || (schedule[0] ? schedule[0].payment : 0);
+  const termMonths = note.termUnit === 'years' ? parseInt(note.term) * 12 : parseInt(note.term);
+  const projDate = stats.projPayoffDate ? fmtDate(stats.projPayoffDate.toISOString().split('T')[0]) : 'N/A';
+  const schedPayoff = schedule.length > 0 ? fmtDate(schedule[schedule.length-1].date) : 'N/A';
+
+  const paidBanner = status === 'paid' ? `<div class="paid-banner">🎉 This note is fully paid off! Congratulations.</div>` : '';
+
+  document.getElementById('detailContent').innerHTML = `
+    ${paidBanner}
+    <div class="detail-header">
+      <div style="flex:1">
+        <div class="detail-title">${note.address}</div>
+        <div class="detail-sub">Borrower: <strong>${note.borrower}</strong> &nbsp;•&nbsp; Started: ${fmtDate(note.startDate)} &nbsp;•&nbsp; ${note.term} ${note.termUnit} term</div>
+        <div class="detail-badge"><span class="badge ${status}" style="font-size:12px">${status === 'current' ? 'Current' : status === 'late' ? 'Late' : 'Paid Off'}</span></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn-secondary" onclick="openEditModal('${note.id}')">Edit Note</button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Current Balance</div>
+        <div class="stat-value">${fmt(stats.balance)}</div>
+        <div class="stat-sub">of ${fmt(note.principal)} original</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Principal Paid</div>
+        <div class="stat-value" style="color:var(--green)">${fmt(stats.totalPrincipalPaid)}</div>
+        <div class="stat-sub">${stats.pctPaid.toFixed(1)}% of loan</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Interest Collected</div>
+        <div class="stat-value" style="color:#b45309">${fmt(stats.totalInterestPaid)}</div>
+        <div class="stat-sub">Interest remaining: ${fmt(stats.totalInterestRemaining)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Monthly Payment</div>
+        <div class="stat-value">${fmt(payment)}</div>
+        <div class="stat-sub">Rate: ${note.rate}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Proj. Payoff Date</div>
+        <div class="stat-value" style="font-size:1rem">${projDate}</div>
+        <div class="stat-sub">Scheduled: ${schedPayoff}</div>
+      </div>
+    </div>
+
+    <!-- LTV -->
+    <div class="ltv-row">
+      <label>Current Property Value ($)</label>
+      <input type="number" id="ltvInput" value="${note.propertyValue || ''}" placeholder="Enter to calculate LTV" onchange="saveLTV('${note.id}', this.value)">
+      <div class="ltv-result" id="ltvResult">
+        ${note.propertyValue ? 'LTV: ' + ((stats.balance / parseFloat(note.propertyValue)) * 100).toFixed(1) + '%' : ''}
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab(event,'tabChart')">📈 Amortization Graph</button>
+      <button class="tab-btn" onclick="switchTab(event,'tabLog')">💰 Payment Log</button>
+      <button class="tab-btn" onclick="switchTab(event,'tabSchedule')">📋 Full Schedule</button>
+    </div>
+
+    <div class="tab-panel active" id="tabChart">
+      <div class="chart-container">
+        <canvas id="amortChart"></canvas>
+      </div>
+      ${stats.projPayoffDate ? `<div class="payoff-info">📅 At current payment pace, this note is projected to pay off on <strong>${projDate}</strong>. Scheduled payoff was ${schedPayoff}.</div>` : ''}
+    </div>
+
+    <div class="tab-panel" id="tabLog">
+      <div class="pay-form">
+        <div class="pay-form-title">💳 Log a Payment Received</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date Received</label>
+            <input type="date" id="p_date" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+          <div class="form-group">
+            <label>Amount Received ($)</label>
+            <input type="number" id="p_amount" placeholder="${payment.toFixed(2)}" min="0" step="0.01">
+          </div>
+          <div class="form-group" style="justify-content:flex-end">
+            <div class="checkbox-row">
+              <input type="checkbox" id="p_late" onchange="toggleLateFee()">
+              <label for="p_late">Mark as Late</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-row" id="lateFeeRow" style="display:none;margin-top:0.5rem">
+          <div class="form-group" style="max-width:200px">
+            <label>Late Fee ($)</label>
+            <input type="number" id="p_lateFee" placeholder="0.00" min="0" step="0.01">
+          </div>
+        </div>
+        <div style="margin-top:1rem">
+          <button class="btn-primary" onclick="logPayment('${note.id}')">Record Payment</button>
+        </div>
+      </div>
+      ${renderLedger(stats.ledger, note)}
+    </div>
+
+    <div class="tab-panel" id="tabSchedule">
+      ${renderScheduleTable(schedule, note.payments || [])}
+    </div>
+  `;
+
+  // Draw chart after DOM is ready
+  setTimeout(() => drawChart(note, schedule, stats), 50);
+}
+
+function renderLedger(ledger, note) {
+  if (ledger.length === 0) {
+    return `<div style="text-align:center;padding:3rem;color:var(--ink-3)">No payments logged yet. Record your first payment above.</div>`;
+  }
+  const rows = [...ledger].reverse().map((p, i) => `
+    <tr class="${p.late ? 'td-late' : ''}">
+      <td class="td-highlight">${fmtDate(p.date)}</td>
+      <td>${fmt(p.amount)}</td>
+      <td class="td-principal">${fmt(p.principal)}</td>
+      <td class="td-interest">${fmt(p.interest)}</td>
+      <td>${p.lateFee > 0 ? fmt(p.lateFee) : '—'}</td>
+      <td class="td-highlight">${fmt(p.balance)}</td>
+      <td>${p.late ? '<span class="badge late">Late</span>' : '<span class="badge current">On Time</span>'}</td>
+      <td><button class="btn-icon danger" onclick="deletePayment('${note.id}', ${ledger.length - 1 - i})">✕</button></td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Amount</th><th>Principal</th><th>Interest</th><th>Late Fee</th><th>Balance</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderScheduleTable(schedule, payments) {
+  const rows = schedule.map((row, i) => {
+    const p = payments[i];
+    const isPaid = !!p;
+    return `
+      <tr>
+        <td>${row.num}</td>
+        <td>${fmtDate(row.date)}${row.isBalloon ? ' <span class="badge" style="background:#fef3c7;color:#92400e">Balloon</span>' : ''}</td>
+        <td>${fmt(row.payment)}</td>
+        <td class="td-principal">${fmt(row.principal)}</td>
+        <td class="td-interest">${fmt(row.interest)}</td>
+        <td class="td-highlight">${fmt(row.balance)}</td>
+        <td>${isPaid ? '<span class="badge current">Paid</span>' : '<span style="color:var(--ink-4);font-size:12px">Pending</span>'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Due Date</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Balance</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function drawChart(note, schedule, stats) {
+  const ctx = document.getElementById('amortChart');
+  if (!ctx) return;
+  if (amortChart) { amortChart.destroy(); amortChart = null; }
+
+  const schedLabels = schedule.map(r => r.date);
+  const schedBalances = schedule.map(r => parseFloat(r.balance.toFixed(2)));
+
+  // Actual curve
+  const actualLabels = [];
+  const actualBalances = [];
+  if (stats.ledger.length > 0) {
+    actualLabels.push(note.startDate);
+    actualBalances.push(parseFloat(note.principal));
+    stats.ledger.forEach(p => {
+      actualLabels.push(p.date);
+      actualBalances.push(parseFloat(p.balance.toFixed(2)));
+    });
+  }
+
+  amortChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Scheduled Balance',
+          data: schedLabels.map((l, i) => ({ x: l, y: schedBalances[i] })),
+          borderColor: '#94a3b8',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0.2
+        },
+        ...(actualBalances.length > 0 ? [{
+          label: 'Actual Balance',
+          data: actualLabels.map((l, i) => ({ x: l, y: actualBalances[i] })),
+          borderColor: '#1a3a5c',
+          backgroundColor: 'rgba(26,58,92,0.07)',
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointBackgroundColor: '#1a3a5c',
+          fill: true,
+          tension: 0.2
+        }] : [])
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: { family: 'DM Sans', size: 12 }, usePointStyle: true }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'year', tooltipFormat: 'MMM yyyy' },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6b7280' }
+        },
+        y: {
+          ticks: {
+            font: { family: 'DM Sans', size: 11 },
+            color: '#6b7280',
+            callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v)
+          },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// TAB / UI UTILS
+// ═══════════════════════════════════════
+function switchTab(e, targetId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  e.target.classList.add('active');
+  document.getElementById(targetId).classList.add('active');
+  if (targetId === 'tabChart' && currentNoteId) {
+    const note = notes.find(n => n.id === currentNoteId);
+    const schedule = buildSchedule(note);
+    const stats = getActualStats(note);
+    setTimeout(() => drawChart(note, schedule, stats), 50);
+  }
+}
+
+function toggleLateFee() {
+  const checked = document.getElementById('p_late').checked;
+  document.getElementById('lateFeeRow').style.display = checked ? 'flex' : 'none';
+}
+
+function saveLTV(id, val) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  note.propertyValue = val;
+  save();
+  const stats = getActualStats(note);
+  document.getElementById('ltvResult').textContent = val ? 'LTV: ' + ((stats.balance / parseFloat(val)) * 100).toFixed(1) + '%' : '';
+}
+
+// ═══════════════════════════════════════
+// PAYMENT ACTIONS
+// ═══════════════════════════════════════
+function logPayment(id) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  const date = document.getElementById('p_date').value;
+  const amount = parseFloat(document.getElementById('p_amount').value);
+  const isLate = document.getElementById('p_late').checked;
+  const lateFee = isLate ? parseFloat(document.getElementById('p_lateFee').value || '0') : 0;
+
+  if (!date || !amount || amount <= 0) { alert('Please enter a valid date and amount.'); return; }
+  if (!note.payments) note.payments = [];
+  note.payments.push({ date, amount, late: isLate, lateFee });
+  save();
+  renderDetail(id);
+}
+
+function deletePayment(id, index) {
+  if (!confirm('Remove this payment entry?')) return;
+  const note = notes.find(n => n.id === id);
+  if (!note || !note.payments) return;
+  note.payments.splice(index, 1);
+  save();
+  renderDetail(id);
+}
+
+// ═══════════════════════════════════════
+// NOTE CRUD
+// ═══════════════════════════════════════
+function openAddModal() {
+  editingNoteId = null;
+  document.getElementById('modalTitle').textContent = 'Add Mortgage Note';
+  ['f_address','f_borrower','f_principal','f_rate','f_term','f_startDate','f_payment','f_balloonDate','f_balloonAmt'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f_termUnit').value = 'years';
+  document.getElementById('noteModal').classList.remove('hidden');
+}
+
+function openEditModal(id) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  editingNoteId = id;
+  document.getElementById('modalTitle').textContent = 'Edit Mortgage Note';
+  document.getElementById('f_address').value = note.address || '';
+  document.getElementById('f_borrower').value = note.borrower || '';
+  document.getElementById('f_principal').value = note.principal || '';
+  document.getElementById('f_rate').value = note.rate || '';
+  document.getElementById('f_term').value = note.term || '';
+  document.getElementById('f_termUnit').value = note.termUnit || 'years';
+  document.getElementById('f_startDate').value = note.startDate || '';
+  document.getElementById('f_payment').value = note.payment || '';
+  document.getElementById('f_balloonDate').value = note.balloonDate || '';
+  document.getElementById('f_balloonAmt').value = note.balloonAmt || '';
+  document.getElementById('noteModal').classList.remove('hidden');
+}
+
+function saveNote() {
+  const address = document.getElementById('f_address').value.trim();
+  const borrower = document.getElementById('f_borrower').value.trim();
+  const principal = parseFloat(document.getElementById('f_principal').value);
+  const rate = parseFloat(document.getElementById('f_rate').value);
+  const term = parseInt(document.getElementById('f_term').value);
+  const termUnit = document.getElementById('f_termUnit').value;
+  const startDate = document.getElementById('f_startDate').value;
+
+  if (!address || !borrower || !principal || !rate || !term || !startDate) {
+    alert('Please fill in all required fields.');
+    return;
+  }
+
+  const termMonths = termUnit === 'years' ? term * 12 : term;
+  const autoPayment = calcMonthlyPayment(principal, rate, termMonths);
+  const paymentInput = parseFloat(document.getElementById('f_payment').value);
+
+  const noteData = {
+    address, borrower,
+    principal: principal.toString(),
+    rate: rate.toString(),
+    term: term.toString(),
+    termUnit,
+    startDate,
+    payment: (paymentInput || autoPayment).toFixed(2),
+    balloonDate: document.getElementById('f_balloonDate').value || '',
+    balloonAmt: document.getElementById('f_balloonAmt').value || ''
+  };
+
+  if (editingNoteId) {
+    const idx = notes.findIndex(n => n.id === editingNoteId);
+    if (idx > -1) {
+      notes[idx] = { ...notes[idx], ...noteData };
+    }
+  } else {
+    notes.push({ id: genId(), payments: [], ...noteData });
+  }
+
+  save();
+  closeModal();
+
+  if (currentNoteId && editingNoteId === currentNoteId) {
+    renderDetail(currentNoteId);
+  } else {
+    renderDashboard();
+  }
+}
+
+function closeModal() {
+  document.getElementById('noteModal').classList.add('hidden');
+  editingNoteId = null;
+}
+
+function confirmDelete(id) {
+  deleteTargetId = id;
+  document.getElementById('confirmModal').classList.remove('hidden');
+  document.getElementById('confirmDeleteBtn').onclick = () => deleteNote(id);
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  deleteTargetId = null;
+}
+
+function deleteNote(id) {
+  notes = notes.filter(n => n.id !== id);
+  save();
+  closeConfirm();
+  if (currentNoteId === id) {
+    showDashboard();
+  } else {
+    renderDashboard();
+  }
+}
+
+// ═══════════════════════════════════════
+// FORMATTERS
+// ═══════════════════════════════════════
+function fmt(n) {
+  return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const parts = d.split('-');
+  return new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Close modals on overlay click
+document.getElementById('noteModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('confirmModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeConfirm(); });
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+renderDashboard();
+</script>
+</body>
+</html>
