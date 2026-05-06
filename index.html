@@ -979,7 +979,9 @@ function renderDetail(id) {
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab(event,'tabChart')">📈 Amortization Graph</button>
       <button class="tab-btn" onclick="switchTab(event,'tabLog')">💰 Payment Log</button>
-      <button class="tab-btn" onclick="switchTab(event,'tabSchedule')">📋 Full Schedule</button>
+      <button class="tab-btn" onclick="switchTab(event,'tabSchedule')">📋 Upcoming</button>
+      <button class="tab-btn" onclick="switchTab(event,'tabPaid')">✓ Paid</button>
+      <button class="tab-btn" onclick="switchTab(event,'tabLate')">⚠ Late</button>
     </div>
 
     <div class="tab-panel active" id="tabChart">
@@ -1022,7 +1024,15 @@ function renderDetail(id) {
     </div>
 
     <div class="tab-panel" id="tabSchedule">
-      ${renderScheduleTable(schedule, note.payments || [], note.id)}
+      ${renderScheduleTable(schedule, note.payments || [], note.id, 'pending')}
+    </div>
+
+    <div class="tab-panel" id="tabPaid">
+      ${renderScheduleTable(schedule, note.payments || [], note.id, 'paid')}
+    </div>
+
+    <div class="tab-panel" id="tabLate">
+      ${renderScheduleTable(schedule, note.payments || [], note.id, 'late')}
     </div>
   `;
 
@@ -1061,22 +1071,40 @@ function renderLedger(ledger, note) {
   `;
 }
 
-function renderScheduleTable(schedule, payments, noteId) {
-  const rows = schedule.map((row, i) => {
+function renderScheduleTable(schedule, payments, noteId, mode) {
+  const filtered = schedule.map((row, i) => {
     const p = payments[i];
     const isPaid = !!p;
+    const isLate = isPaid && p.late;
+    if (mode === 'pending' && isPaid) return null;
+    if (mode === 'paid' && (!isPaid || isLate)) return null;
+    if (mode === 'late' && (!isPaid || !isLate)) return null;
+    return { row, i, isLate };
+  }).filter(Boolean);
+
+  if (filtered.length === 0) {
+    const msg = mode === 'pending' ? 'All payments received — nothing pending!'
+      : mode === 'paid' ? 'No paid months yet.'
+      : 'No late payments.';
+    return `<div style="text-align:center;padding:3rem;color:var(--ink-3)">${msg}</div>`;
+  }
+
+  const rows = filtered.map(({ row, i, isLate }) => {
+    const actionCell = mode === 'pending'
+      ? `<div style="display:flex;gap:6px">
+           <button class="btn-icon" onclick="markScheduledPayment('${noteId}', ${i}, false)">Mark Paid</button>
+           <button class="btn-icon danger" onclick="markScheduledPayment('${noteId}', ${i}, true)">Late</button>
+         </div>`
+      : (isLate ? '<span class="badge late">Late</span>' : '<span class="badge current">Paid</span>');
     return `
-      <tr>
+      <tr class="${isLate ? 'td-late' : ''}">
         <td>${row.num}</td>
         <td>${fmtDate(row.date)}${row.isBalloon ? ' <span class="badge" style="background:#fef3c7;color:#92400e">Balloon</span>' : ''}</td>
         <td>${fmt(row.payment)}</td>
         <td class="td-principal">${fmt(row.principal)}</td>
         <td class="td-interest">${fmt(row.interest)}</td>
         <td class="td-highlight">${fmt(row.balance)}</td>
-        <td>${isPaid
-          ? '<span class="badge current">Paid</span>'
-          : `<button class="btn-icon" onclick="markScheduledPayment('${noteId}', ${i})">Mark Paid</button>`
-        }</td>
+        <td>${actionCell}</td>
       </tr>
     `;
   }).join('');
@@ -1095,19 +1123,19 @@ function renderScheduleTable(schedule, payments, noteId) {
   `;
 }
 
-function markScheduledPayment(id, schedIdx) {
+function markScheduledPayment(id, schedIdx, isLate) {
   const note = notes.find(n => n.id === id);
   if (!note) return;
   const schedule = buildSchedule(note);
   const row = schedule[schedIdx];
   if (!row) return;
   if (!note.payments) note.payments = [];
-  note.payments.push({ date: row.date, amount: row.payment, late: false, lateFee: 0 });
+  note.payments.push({ date: row.date, amount: row.payment, late: !!isLate, lateFee: 0 });
   save();
   renderDetail(id);
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const schedBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Full Schedule'));
+  const schedBtn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Upcoming'));
   if (schedBtn) schedBtn.classList.add('active');
   document.getElementById('tabSchedule').classList.add('active');
 }
